@@ -20,6 +20,7 @@ public class SharedItemSchemaV1 extends MappedSchema {
     public static class PersistentSharedItem extends PersistentState {
         @Column(name = "share_from") private final String from;
         @Column(name = "share_to") private final String to;
+        @Column(name = "share_to_tmp") private final String toTmpId;
         @Column(name = "share_link") private final String link;
         @Column(name = "share_timestamp") private final long timestamp;
         @Column(name = "linear_id") private final UUID linearId;
@@ -29,6 +30,10 @@ public class SharedItemSchemaV1 extends MappedSchema {
         }
 
         public String getTo() {
+            return to;
+        }
+
+        public String getToTmpId() {
             return to;
         }
 
@@ -44,12 +49,20 @@ public class SharedItemSchemaV1 extends MappedSchema {
             return linearId;
         }
 
-        public PersistentSharedItem(String from, String to, String link, long timestamp, UUID linearId) {
+        public PersistentSharedItem() {
+            this(null, null, null, null, null, null);
+        }
+
+        public PersistentSharedItem(String from, String to, String toTmpId, String link, Long timestamp, UUID linearId) {
+//            assert (to == null && toTmpId != null) || to != null && toTmpId == null: "expected either 'to' or 'toTmpId'";
+
             this.from = from;
             this.to = to;
+            this.toTmpId = toTmpId;
             this.link = link;
             this.timestamp = timestamp;
             this.linearId = linearId;
         }
+
     }
 }

@@ -1,5 +1,6 @@
 package com.template;
 
+import com.google.common.collect.ImmutableList;
 import net.corda.core.concurrent.CordaFuture;
 import net.corda.core.contracts.StateAndContract;
 import net.corda.core.contracts.StateAndRef;
@@ -24,6 +25,7 @@ import java.util.List;
 
 import static net.corda.testing.CoreTestUtils.setCordappPackages;
 import static net.corda.testing.CoreTestUtils.unsetCordappPackages;
+import static net.corda.core.contracts.ContractsDSL.requireThat;
 
 public class FlowTests {
     private MockNetwork network;
@@ -97,5 +99,35 @@ public class FlowTests {
 //        List<StateAndRef<SharedItemState>> statesCHas = c.getServices().getVaultService().queryBy(SharedItemState.class).getStates();
 //        SharedItemState stateCHas = statesCHas.get(0).getState().component1();
         assert(stateCHas.getLink().equals(link));
+    }
+
+    @Test
+    public void shareAndResolveTo() throws Exception {
+        List<String> links = ImmutableList.of("link1", "link2");
+        String tmpId = "Billy Bob";
+        Party bob = b.getInfo().getLegalIdentities().get(0);
+        for (String link: links) {
+            SharedItemCreateFlow createFlow = new SharedItemCreateFlow(tmpId, link);
+            CordaFuture<SignedTransaction> createFlowFuture = a.getServices().startFlow(createFlow).getResultFuture();
+            network.runNetwork();
+
+            SignedTransaction signedCreateFlowTx = createFlowFuture.get();
+            signedCreateFlowTx.verifyRequiredSignatures();
+        }
+
+        ResolveToIdentityFlow resolveFlow = new ResolveToIdentityFlow(tmpId, bob);
+//        CordaFuture<SignedTransaction> shareFlowFuture = a.getServices().startFlow(shareFlow).getResultFuture();
+        CordaFuture<List<SignedTransaction>> resolveFlowFuture = a.getServices().startFlow(resolveFlow).getResultFuture();
+        network.runNetwork();
+
+        List<SignedTransaction> txs = resolveFlowFuture.get();
+        assert txs.size() == links.size() : "all shared items have been resolved";
+        for (int i = 0; i < txs.size(); i++) {
+            SignedTransaction tx = txs.get(i);
+            SharedItemState state = (SharedItemState) tx.getTx().getOutput(0);
+            assert state.getLink().equals(links.get(i)) : "'link' matches original";
+            assert state.getTo().equals(bob) : "'to' has been resolved";
+            assert state.getToTmpId() == null : "'toTmpId' has been cleared";
+        }
     }
 }

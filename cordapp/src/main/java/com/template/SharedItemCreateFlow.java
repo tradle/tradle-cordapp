@@ -20,12 +20,14 @@ import static com.template.SharedItemContract.SHARED_SPACE_CONTRACT_ID;
 import java.security.PublicKey;
 import java.security.SignatureException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 @InitiatingFlow
 @StartableByRPC
 public class SharedItemCreateFlow extends FlowLogic<SignedTransaction> {
     private final Party to;
+    private final String toTmpId;
     private final String link;
     private final long timestamp;
     private static final Step ID_OTHER_NODES = new Step("Identifying other nodes on the network.");
@@ -62,14 +64,16 @@ public class SharedItemCreateFlow extends FlowLogic<SignedTransaction> {
 
     public SharedItemCreateFlow(Party to, String link) {
         this.to = to;
+        this.toTmpId = null;
         this.link = link;
         this.timestamp = System.currentTimeMillis();
     }
 
-    public SharedItemCreateFlow(Party to, String link, long timestamp) {
-        this.to = to;
+    public SharedItemCreateFlow(String toTmpId, String link) {
+        this.to = null;
+        this.toTmpId = toTmpId;
         this.link = link;
-        this.timestamp = timestamp;
+        this.timestamp = System.currentTimeMillis();
     }
 
     @Override
@@ -91,11 +95,17 @@ public class SharedItemCreateFlow extends FlowLogic<SignedTransaction> {
         progressTracker.setCurrentStep(OTHER_TX_COMPONENTS);
 
         // We create the transaction components.
-        SharedItemState outputState = new SharedItemState(getOurIdentity(), to, this.link, timestamp);
+        SharedItemState outputState = to == null
+            ?    new SharedItemState(getOurIdentity(), toTmpId, this.link, timestamp)
+            :    new SharedItemState(getOurIdentity(), to, this.link, timestamp);
+
         StateAndContract outputContractAndState = new StateAndContract(outputState, SHARED_SPACE_CONTRACT_ID);
         // only consumer's signature is required
-        List<PublicKey> requiredSigners = ImmutableList.of(getOurIdentity().getOwningKey(), to.getOwningKey());
-        Command cmd = new Command<>(new SharedItemContract.Create(), requiredSigners);
+        List<PublicKey> requiredSigners = new ArrayList<>();
+        requiredSigners.add(getOurIdentity().getOwningKey());
+        if (to != null) requiredSigners.add(to.getOwningKey());
+
+        Command cmd = new Command<>(new SharedItemContract.Create(), ImmutableList.copyOf(requiredSigners));
         final TimeWindow window = TimeWindow.withTolerance(getServiceHub().getClock().instant(), Duration.ofSeconds(30));
 
         progressTracker.setCurrentStep(TX_BUILDING);
@@ -112,6 +122,10 @@ public class SharedItemCreateFlow extends FlowLogic<SignedTransaction> {
         final SignedTransaction signedTx = getServiceHub().signInitialTransaction(txBuilder);
 
         progressTracker.setCurrentStep(SIGS_GATHERING);
+
+        if (to == null) {
+            return subFlow(new FinalityFlow(signedTx));
+        }
 
         // Creating a session with the other party.
         FlowSession recipientSession = initiateFlow(to);

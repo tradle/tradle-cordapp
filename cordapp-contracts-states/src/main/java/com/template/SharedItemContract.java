@@ -8,6 +8,7 @@ import net.corda.core.contracts.TimeWindow;
 import net.corda.core.identity.Party;
 import net.corda.core.transactions.LedgerTransaction;
 
+import java.lang.reflect.Field;
 import java.security.PublicKey;
 import java.time.Instant;
 import java.util.*;
@@ -22,6 +23,7 @@ public class SharedItemContract implements Contract {
     public static final String SHARED_SPACE_CONTRACT_ID = "com.template.SharedItemContract";
 
     public static class Create implements CommandData {}
+    public static class ResolveTo implements CommandData {}
 //    public static class Share implements CommandData {}
 
     /**
@@ -37,6 +39,8 @@ public class SharedItemContract implements Contract {
         CommandData value = command.getValue();
         if (value instanceof Create) {
             verifyCreate(tx, command);
+        } else if (value instanceof ResolveTo) {
+            verifyResolveTo(tx, command);
         }
 //        else if (value instanceof Share) {
 //            verifyShare(tx, command);
@@ -52,21 +56,48 @@ public class SharedItemContract implements Contract {
             final SharedItemState out = tx.outputsOfType(SharedItemState.class).get(0);
             check.using("the output state should be of type SharedItemState", out != null);
 
+            check.using("The shared link should be non-null.", out.getLink() != null);
+
             final Party from = out.getFrom();
             final Party to = out.getTo();
-            check.using("'from' and 'to' cannot be the same entity.", from != to);
-            check.using("The shared link should be non-null.", out.getLink() != null);
+            final String toTmpId = out.getToTmpId();
 
             // Constraints on the signers.
             final List<PublicKey> signers = command.getSigners();
-//            check.using("'to' must be a signer.", signers.containsAll(ImmutableList.of(to.getOwningKey())));
-//            check.using("There must be two signers.", signers.size() == 2);
-            check.using("The from and to must be signers.", signers.containsAll(
-                    ImmutableList.of(from.getOwningKey(), to.getOwningKey())));
+            check.using("'From' is a signer", signers.contains(from.getOwningKey()));
+            if (to == null) {
+                check.using("'toTmpId' is not null", toTmpId != null);
+            } else {
+                // TODO
+//                check.using("'To' is a signer", signers.contains(to));
+                check.using("'from' and 'to' cannot be the same entity.", !from.equals(to));
+            }
 
             TimeWindow window = tx.getTimeWindow();
             long timestamp = out.getTimestamp();
-            check.using("timestamp is in time window" + timestamp + ", from: " + window.getFromTime().toEpochMilli() + ", to: " + window.getUntilTime().toEpochMilli(), window.contains(Instant.ofEpochMilli(timestamp)));
+            check.using(
+                    String.format("timestamp %d is in time window %d to %d", timestamp, window.getFromTime().toEpochMilli(), window.getUntilTime().toEpochMilli()),
+                    window.contains(Instant.ofEpochMilli(timestamp))
+            );
+            return null;
+        });
+    }
+
+    private void verifyResolveTo(LedgerTransaction tx, CommandWithParties<CommandData> command) {
+        requireThat(check -> {
+            // Constraints on the shape of the transaction.
+            check.using("There should be one input", tx.getInputs().size() == 1);
+            check.using("There should be one output state", tx.getOutputs().size() == 1);
+            SharedItemState before = (SharedItemState) tx.getInput(0);
+            SharedItemState after = (SharedItemState) tx.getOutput(0);
+            check.using("'from' should not have changed", before.getFrom().equals(after.getFrom()));
+            check.using("'timestamp' should not have changed",before.getTimestamp() == after.getTimestamp());
+            check.using("'link' should not have changed",before.getLink().equals(after.getLink()));
+            check.using("previous 'to' should have been null",before.getTo() == null);
+            check.using("'to' should be non-null",after.getTo() != null);
+            check.using("previous 'toTmpId' should have been non-null",before.getToTmpId() != null);
+            check.using("'toTmpId' should be null",after.getToTmpId() == null);
+            check.using("'from' and 'to' cannot be the same entity.", !after.getFrom().equals(after.getTo()));
             return null;
         });
     }

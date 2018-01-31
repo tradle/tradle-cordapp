@@ -18,7 +18,7 @@ public class TemplateWebPlugin implements WebServerPluginRegistry {
     @NotNull
     @Override
     public List<Function<CordaRPCOps, ?>> getWebApis() {
-        return ImmutableList.of(TemplateApi::new);
+        return ImmutableList.of(SharedItemApi::new);
     }
 
     /**

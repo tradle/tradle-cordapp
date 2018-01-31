@@ -26,6 +26,7 @@ import java.util.Map;
 public class SharedItemState implements QueryableState, LinearState {
     private final Party from;
     private final Party to;
+    private final String toTmpId;
     private final long timestamp;
     private final String link;
     private final UniqueIdentifier linearId;
@@ -38,6 +39,21 @@ public class SharedItemState implements QueryableState, LinearState {
     public SharedItemState(Party from, Party to, String link, long timestamp) {
         this.from = from;
         this.to = to;
+        this.toTmpId = null;
+        this.link = link;
+        this.timestamp = timestamp;
+        this.linearId = new UniqueIdentifier();
+    }
+
+    /**
+     * @param link links to shared data.
+     * @param from the party sharing data.
+     * @param toTmpId the tmp id of the party receiving shared data.
+     */
+    public SharedItemState(Party from, String toTmpId, String link, long timestamp) {
+        this.from = from;
+        this.to = null;
+        this.toTmpId = toTmpId;
         this.link = link;
         this.timestamp = timestamp;
         this.linearId = new UniqueIdentifier();
@@ -47,20 +63,27 @@ public class SharedItemState implements QueryableState, LinearState {
     public long getTimestamp() { return timestamp; }
     public Party getFrom() { return from; }
     public Party getTo() { return to; }
+    public String getToTmpId() { return toTmpId; }
     @Override
     public UniqueIdentifier getLinearId() { return linearId; }
 
     @Override
-    public List<AbstractParty> getParticipants() { return Arrays.asList(from, to); }
+    public List<AbstractParty> getParticipants() {
+        if (to == null) return Arrays.asList(from);
+
+        return Arrays.asList(from, to);
+    }
 
     @Override public PersistentState generateMappedObject(MappedSchema schema) {
         if (schema instanceof SharedItemSchemaV1) {
             return new SharedItemSchemaV1.PersistentSharedItem(
-                    this.from.getName().toString(),
-                    this.to.getName().toString(),
-                    this.link,
-                    this.timestamp,
-                    this.linearId.getId());
+                    from.getName().toString(),
+                    to == null ? null : to.getName().toString(),
+                    toTmpId,
+                    link,
+                    timestamp,
+                    linearId.getId()
+            );
         } else {
             throw new IllegalArgumentException("Unrecognised schema $schema");
         }
