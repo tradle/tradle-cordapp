@@ -2,9 +2,9 @@ package com.template;
 
 // Add these imports:
 import com.google.common.collect.ImmutableList;
+import com.template.schema.SharedItemSchemaV1;
 import net.corda.core.contracts.StateAndContract;
 import net.corda.core.contracts.StateAndRef;
-import net.corda.core.contracts.TimeWindow;
 import net.corda.core.flows.*;
 import co.paralleluniverse.fibers.Suspendable;
 import net.corda.core.contracts.Command;
@@ -21,7 +21,6 @@ import net.corda.core.utilities.ProgressTracker.Step;
 import static com.template.SharedItemContract.SHARED_SPACE_CONTRACT_ID;
 
 import java.lang.reflect.Field;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -86,11 +85,11 @@ public class ResolveToIdentityFlow extends FlowLogic<List<SignedTransaction>> {
 
         CriteriaExpression tmpIdCriteria = Builder.equal(tmpIdField, tmpId);
         QueryCriteria criteria = new VaultQueryCriteria(Vault.StateStatus.UNCONSUMED);
+//        QueryCriteria criteria = new VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
 //                .and(new VaultCustomQueryCriteria(tmpIdCriteria));
 
         Vault.Page<SharedItemState> results = getServiceHub()
                 .getVaultService()
-//                .queryBy(SharedItemState.class);
                 .queryBy(SharedItemState.class, criteria, new PageSpecification(QueryCriteriaUtils.DEFAULT_PAGE_NUM, PAGE_SIZE));
 
         List<SignedTransaction> result = new ArrayList<>();

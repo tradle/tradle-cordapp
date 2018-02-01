@@ -2,7 +2,7 @@
   <configuration default="false" name="Run Flow Tests" type="JUnit" factoryName="JUnit">
     <extension name="coverage" enabled="false" merge="false" sample_coverage="true" runner="idea">
       <pattern>
-        <option name="PATTERN" value="com.template.*" />
+        <option name="PATTERN" value="com.template.schema.*" />
         <option name="ENABLED" value="true" />
       </pattern>
     </extension>

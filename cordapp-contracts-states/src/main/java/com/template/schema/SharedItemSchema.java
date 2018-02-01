@@ -1,4 +1,4 @@
-package com.template;
+package com.template.schema;
 
 public class SharedItemSchema {
 }

@@ -1,7 +1,6 @@
-package com.template;
+package com.template.schema;
 
 import com.google.common.collect.ImmutableList;
-import net.corda.core.identity.Party;
 import net.corda.core.schemas.MappedSchema;
 import net.corda.core.schemas.PersistentState;
 
@@ -49,13 +48,11 @@ public class SharedItemSchemaV1 extends MappedSchema {
             return linearId;
         }
 
-        public PersistentSharedItem() {
-            this(null, null, null, null, null, null);
-        }
+//        public PersistentSharedItem() {
+//            this(null, null, null, null, null, null);
+//        }
 
         public PersistentSharedItem(String from, String to, String toTmpId, String link, Long timestamp, UUID linearId) {
-//            assert (to == null && toTmpId != null) || to != null && toTmpId == null: "expected either 'to' or 'toTmpId'";
-
             this.from = from;
             this.to = to;
             this.toTmpId = toTmpId;

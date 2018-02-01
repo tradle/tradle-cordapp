@@ -3,7 +3,7 @@ package com.template;
 //import com.template.schema.SharedSpaceSchemaV1;
 //import com.template.schema.Link;
 import com.google.common.collect.ImmutableList;
-import net.corda.core.contracts.ContractState;
+import com.template.schema.SharedItemSchemaV1;
 import net.corda.core.contracts.LinearState;
 import net.corda.core.contracts.UniqueIdentifier;
 import net.corda.core.identity.AbstractParty;
@@ -11,12 +11,9 @@ import net.corda.core.identity.Party;
 import net.corda.core.schemas.MappedSchema;
 import net.corda.core.schemas.PersistentState;
 import net.corda.core.schemas.QueryableState;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * The state object recording shared data agreements between two parties.
@@ -74,7 +71,8 @@ public class SharedItemState implements QueryableState, LinearState {
         return Arrays.asList(from, to);
     }
 
-    @Override public PersistentState generateMappedObject(MappedSchema schema) {
+    @Override
+    public PersistentState generateMappedObject(MappedSchema schema) {
         if (schema instanceof SharedItemSchemaV1) {
             return new SharedItemSchemaV1.PersistentSharedItem(
                     from.getName().toString(),
@@ -89,7 +87,8 @@ public class SharedItemState implements QueryableState, LinearState {
         }
     }
 
-    @Override public Iterable<MappedSchema> supportedSchemas() {
+    @Override
+    public Iterable<MappedSchema> supportedSchemas() {
         return ImmutableList.of(new SharedItemSchemaV1());
     }
 
