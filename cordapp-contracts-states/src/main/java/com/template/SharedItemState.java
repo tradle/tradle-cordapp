@@ -31,25 +31,11 @@ public class SharedItemState implements QueryableState, LinearState {
     /**
      * @param link links to shared data.
      * @param from the party sharing data.
-     * @param to the party receiving shared data.
-     */
-    public SharedItemState(Party from, Party to, String link, long timestamp) {
-        this.from = from;
-        this.to = to;
-        this.toTmpId = null;
-        this.link = link;
-        this.timestamp = timestamp;
-        this.linearId = new UniqueIdentifier();
-    }
-
-    /**
-     * @param link links to shared data.
-     * @param from the party sharing data.
      * @param toTmpId the tmp id of the party receiving shared data.
      */
-    public SharedItemState(Party from, String toTmpId, String link, long timestamp) {
+    public SharedItemState(Party from, Party to, String toTmpId, String link, long timestamp) {
         this.from = from;
-        this.to = null;
+        this.to = to;
         this.toTmpId = toTmpId;
         this.link = link;
         this.timestamp = timestamp;

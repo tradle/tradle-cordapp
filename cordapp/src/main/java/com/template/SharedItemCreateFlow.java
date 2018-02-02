@@ -95,10 +95,7 @@ public class SharedItemCreateFlow extends FlowLogic<SignedTransaction> {
         progressTracker.setCurrentStep(OTHER_TX_COMPONENTS);
 
         // We create the transaction components.
-        SharedItemState outputState = to == null
-            ?    new SharedItemState(getOurIdentity(), toTmpId, this.link, timestamp)
-            :    new SharedItemState(getOurIdentity(), to, this.link, timestamp);
-
+        SharedItemState outputState = new SharedItemState(getOurIdentity(), to, toTmpId, this.link, timestamp);
         StateAndContract outputContractAndState = new StateAndContract(outputState, SHARED_SPACE_CONTRACT_ID);
         // only consumer's signature is required
         List<PublicKey> requiredSigners = new ArrayList<>();

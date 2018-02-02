@@ -32,10 +32,11 @@ public class ResolveToIdentityFlow extends FlowLogic<List<SignedTransaction>> {
     private final String tmpId;
     private static final Step ID_OTHER_NODES = new Step("Identifying other nodes on the network.");
     private static final Step QUERY_VAULT = new Step("Querying vault for items with unresolved 'to'.");
-    private static final Step RESOLVE_TO = new Step("Creating transactions per 'to' identity resolved.");
+    private static final Step RESOLVE_TO = new Step("Creating transactions per 'to' party resolved.");
     private static final Step TX_BUILDING = new Step("Building a transaction.");
     private static final Step TX_VERIFICATION = new Step("Verifying a transaction.");
     private static final Step TX_SIGNING = new Step("Signing a transaction.");
+    private static final Step TX_SHARING = new Step("Sharing transaction with resolved party.");
     private static final Step FINALISATION = new Step("Finalising a transaction.") {
         @Override
         public ProgressTracker childProgressTracker() {
@@ -50,6 +51,7 @@ public class ResolveToIdentityFlow extends FlowLogic<List<SignedTransaction>> {
             TX_BUILDING,
             TX_VERIFICATION,
             TX_SIGNING,
+            TX_SHARING,
             FINALISATION
     );
 
@@ -84,9 +86,9 @@ public class ResolveToIdentityFlow extends FlowLogic<List<SignedTransaction>> {
         }
 
         CriteriaExpression tmpIdCriteria = Builder.equal(tmpIdField, tmpId);
-        QueryCriteria criteria = new VaultQueryCriteria(Vault.StateStatus.UNCONSUMED);
-//        QueryCriteria criteria = new VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
-//                .and(new VaultCustomQueryCriteria(tmpIdCriteria));
+//        QueryCriteria criteria = new VaultQueryCriteria(Vault.StateStatus.UNCONSUMED);
+        QueryCriteria criteria = new VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+                .and(new VaultCustomQueryCriteria(tmpIdCriteria));
 
         Vault.Page<SharedItemState> results = getServiceHub()
                 .getVaultService()
@@ -107,7 +109,7 @@ public class ResolveToIdentityFlow extends FlowLogic<List<SignedTransaction>> {
 //        final TimeWindow window = TimeWindow.withTolerance(getServiceHub().getClock().instant(), Duration.ofSeconds(30));
         SharedItemState inputState = stateAndRef.getState().component1();
         Command cmd = new Command<>(new SharedItemContract.ResolveTo(), ImmutableList.of(getOurIdentity().getOwningKey()));
-        SharedItemState outputState = new SharedItemState(inputState.getFrom(), to, inputState.getLink(), inputState.getTimestamp());
+        SharedItemState outputState = new SharedItemState(inputState.getFrom(), to, null, inputState.getLink(), inputState.getTimestamp());
         StateAndContract outputContractAndState = new StateAndContract(outputState, SHARED_SPACE_CONTRACT_ID);
 
         progressTracker.setCurrentStep(TX_BUILDING);
@@ -122,6 +124,10 @@ public class ResolveToIdentityFlow extends FlowLogic<List<SignedTransaction>> {
 
         progressTracker.setCurrentStep(TX_SIGNING);
         final SignedTransaction signedTx = getServiceHub().signInitialTransaction(txBuilder);
+
+//        progressTracker.setCurrentStep(TX_SHARING);
+//        FlowSession session = initiateFlow(party);
+//        subFlow(new SendTransactionFlow(session, signedTx));
 
         progressTracker.setCurrentStep(FINALISATION);
         return subFlow(new FinalityFlow(signedTx));

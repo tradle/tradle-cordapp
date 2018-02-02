@@ -48,9 +48,9 @@ public class SharedItemSchemaV1 extends MappedSchema {
             return linearId;
         }
 
-//        public PersistentSharedItem() {
-//            this(null, null, null, null, null, null);
-//        }
+        public PersistentSharedItem() {
+            this("", "", "", "", 0L, UUID.randomUUID());
+        }
 
         public PersistentSharedItem(String from, String to, String toTmpId, String link, Long timestamp, UUID linearId) {
             this.from = from;

@@ -13,14 +13,13 @@ import net.corda.core.transactions.SignedTransaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.swing.plaf.nimbus.State;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 // This API is accessible from /api/template. The endpoint paths specified below are relative to it.
 @Path("share")
@@ -33,11 +32,95 @@ public class SharedItemApi {
         this.rpcOps = rpcOps;
     }
 
+    private List<TransactionIdWrapper> txsToIds (List<SignedTransaction> txs) {
+        return txs.stream().map(TransactionIdWrapper::new).collect(Collectors.toList());
+    }
+
     /**
-     * Accessible at /api/template/templateGetEndpoint.
+     * @return state tips
+     */
+    private List<StateAndRef<SharedItemState>> getSharedItems() {
+        QueryCriteria criteria = new QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED);
+        return rpcOps
+            .vaultQueryByCriteria(criteria, SharedItemState.class)
+            .getStates();
+    }
+
+    /**
+     * @param partyTmpId optional
+     * @return state tips, optionally limited to those with unresolved identities
+     */
+    private List<StateAndRef<SharedItemState>> getUnresolvedParties(String partyTmpId) {
+        Field toTmpIdField;
+        try {
+            toTmpIdField = SharedItemState.class.getDeclaredField("toTmpId");
+        } catch (NoSuchFieldException e) {
+            throw new RuntimeException("expected SharedItemState to have field 'toTmpId'", e);
+        }
+
+        CriteriaExpression linkCriteria = Builder.equal(toTmpIdField, partyTmpId);
+        QueryCriteria criteria = new QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+            .and(new QueryCriteria.VaultCustomQueryCriteria(linkCriteria));
+
+        return rpcOps
+                .vaultQueryByCriteria(criteria, SharedItemState.class)
+                .getStates();
+    }
+
+    private List<StateAndRef<SharedItemState>> getStatesWithLink(String link) {
+        Field linkField;
+        try {
+            linkField = SharedItemState.class.getDeclaredField("link");
+        } catch (NoSuchFieldException e) {
+            throw new RuntimeException("expected SharedItemState to have field 'link'", e);
+        }
+
+        CriteriaExpression linkCriteria = Builder.equal(linkField, link);
+        QueryCriteria criteria = new QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+                .and(new QueryCriteria.VaultCustomQueryCriteria(linkCriteria));
+
+        return rpcOps
+                .vaultQueryByCriteria(criteria, SharedItemState.class)
+                .getStates();
+
+    }
+
+    /**
+     * Displays all states with unresolved "to" that exist in the node's vault.
+     */
+    @GET
+    @Path("unresolved/{partyTmpId}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<StateAndRef<SharedItemState>> getUnresolvedPartiesHandler(@PathParam("partyTmpId") String partyTmpId) {
+        return getUnresolvedParties(partyTmpId);
+    }
+
+    /**
+     * Displays all states with unresolved "to" that exist in the node's vault.
+     */
+    @GET
+    @Path("item/{link}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<StateAndRef<SharedItemState>> getStatesWithLinkHandler(@PathParam("link") String link) {
+        return getStatesWithLink(link);
+    }
+
+    /**
+     * Displays all state tips in the node's vault.
+     */
+    @GET
+    @Path("items")
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<StateAndRef<SharedItemState>> getSharedItemsHandler() {
+        return getSharedItems();
+    }
+
+    /**
+     * Accessible at /api/share/item
      */
     @POST
-    @Path("link")
+    @Path("item")
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     @Produces(MediaType.APPLICATION_JSON)
     public Response createSharedItemHandler(
             @FormParam("link") String link,
@@ -49,14 +132,16 @@ public class SharedItemApi {
             if (partyTmpId == null) {
                 return Response
                         .status(Status.BAD_REQUEST)
-                        .entity("Query parameter 'partyName' or 'partyTmpId' must be provided.\n").build();
+                        .entity("Query parameter 'partyName' or 'partyTmpId' must be provided.\n")
+                        .build();
             }
         } else {
             final Party otherParty = rpcOps.wellKnownPartyFromX500Name(partyName);
             if (otherParty == null) {
                 return Response
                         .status(Status.BAD_REQUEST)
-                        .entity("Party named " + partyName + "cannot be found.\n").build();
+                        .entity("Party named " + partyName + "cannot be found.\n")
+                        .build();
             }
         }
 
@@ -75,21 +160,26 @@ public class SharedItemApi {
                     .getReturnValue()
                     .get();
 
-            final String msg = String.format("Transaction id %s committed to ledger.\n", result.getId());
-            return Response.status(Status.CREATED).entity(msg).build();
+            return Response
+                    .status(Status.CREATED)
+                    .entity(new TransactionIdWrapper(result.getId().toString()))
+                    .build();
 
         } catch (Throwable ex) {
             final String msg = ex.getMessage();
             logger.error(ex.getMessage(), ex);
-            return Response.status(Response.Status.BAD_REQUEST).entity(msg).build();
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(msg)
+                    .build();
         }
     }
 
     /**
-     * Accessible at /api/share/resolveparty.
+     * Accessible at /api/share/resolveparty
      */
     @POST
     @Path("resolveparty")
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     @Produces(MediaType.APPLICATION_JSON)
     public Response resolvePartyHandler(
             @FormParam("partyTmpId") String partyTmpId,
@@ -117,83 +207,13 @@ public class SharedItemApi {
                     .getReturnValue()
                     .get();
 
-            StringBuilder ids = new StringBuilder();
-            for (SignedTransaction tx: result) {
-                ids.append(tx.getId());
-                ids.append(", ");
-            }
-
-            final String msg = String.format("Transactions %s committed to ledger.\n", ids.toString());
-            return Response.status(Status.CREATED).entity(msg).build();
+            return Response.status(Status.CREATED)
+                    .entity(txsToIds(result))
+                    .build();
         } catch (Throwable ex) {
             final String msg = ex.getMessage();
             logger.error(ex.getMessage(), ex);
             return Response.status(Response.Status.BAD_REQUEST).entity(msg).build();
         }
-    }
-
-    private List<StateAndRef<SharedItemState>> getUnconsumed() {
-        return rpcOps
-            .vaultQueryByCriteria(new QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED), SharedItemState.class)
-            .getStates();
-    }
-
-    private List<StateAndRef<SharedItemState>> getStatesForLink(String link) {
-        Field linkField;
-        try {
-            linkField = SharedItemState.class.getDeclaredField("link");
-        } catch (NoSuchFieldException e) {
-            throw new RuntimeException("expected SharedItemState to have field 'link'", e);
-        }
-
-        CriteriaExpression linkCriteria = Builder.equal(linkField, link);
-        QueryCriteria criteria = new QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
-                .and(new QueryCriteria.VaultCustomQueryCriteria(linkCriteria));
-
-        return rpcOps
-                .vaultQueryByCriteria(criteria, SharedItemState.class)
-                .getStates();
-
-    }
-
-    /**
-     * Displays all states with unresolved "to" that exist in the node's vault.
-     */
-    @GET
-    @Path("unresolved")
-    @Produces(MediaType.APPLICATION_JSON)
-    public List<StateAndRef<SharedItemState>> getUnresolvedPartiesHandler(@PathParam("partyTmpId") String partyTmpId) {
-        List<StateAndRef<SharedItemState>> all = getUnconsumed();
-        List<StateAndRef<SharedItemState>> unresolved = new ArrayList<>();
-        for (StateAndRef<SharedItemState> wrapper: all) {
-            SharedItemState state = wrapper.getState().component1();
-            if (state.getTo() == null) {
-                if (partyTmpId == null || state.getToTmpId().equals(partyTmpId)) {
-                    unresolved.add(wrapper);
-                }
-            }
-        }
-
-        return unresolved;
-    }
-
-    /**
-     * Displays all states with unresolved "to" that exist in the node's vault.
-     */
-    @GET
-    @Path("link")
-    @Produces(MediaType.APPLICATION_JSON)
-    public List<StateAndRef<SharedItemState>> getStatesForLinkHandler(@PathParam("link") String link) {
-        return getStatesForLink(link);
-    }
-
-    /**
-     * Displays all states with unresolved "to" that exist in the node's vault.
-     */
-    @GET
-    @Path("links")
-    @Produces(MediaType.APPLICATION_JSON)
-    public List<StateAndRef<SharedItemState>> getLinksHandler() {
-        return getUnconsumed();
     }
 }
