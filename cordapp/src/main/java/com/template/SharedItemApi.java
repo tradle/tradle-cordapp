@@ -27,62 +27,15 @@ public class SharedItemApi {
     static private final Logger logger = LoggerFactory.getLogger(SharedItemApi.class);
 
     private final CordaRPCOps rpcOps;
+    private final SharedItemClient client;
 
     public SharedItemApi(CordaRPCOps rpcOps) {
         this.rpcOps = rpcOps;
+        this.client = new SharedItemClient(rpcOps);
     }
 
     private List<TransactionIdWrapper> txsToIds (List<SignedTransaction> txs) {
         return txs.stream().map(TransactionIdWrapper::new).collect(Collectors.toList());
-    }
-
-    /**
-     * @return state tips
-     */
-    private List<StateAndRef<SharedItemState>> getSharedItems() {
-        QueryCriteria criteria = new QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED);
-        return rpcOps
-            .vaultQueryByCriteria(criteria, SharedItemState.class)
-            .getStates();
-    }
-
-    /**
-     * @param partyTmpId optional
-     * @return state tips, optionally limited to those with unresolved identities
-     */
-    private List<StateAndRef<SharedItemState>> getUnresolvedParties(String partyTmpId) {
-        Field toTmpIdField;
-        try {
-            toTmpIdField = SharedItemState.class.getDeclaredField("toTmpId");
-        } catch (NoSuchFieldException e) {
-            throw new RuntimeException("expected SharedItemState to have field 'toTmpId'", e);
-        }
-
-        CriteriaExpression linkCriteria = Builder.equal(toTmpIdField, partyTmpId);
-        QueryCriteria criteria = new QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
-            .and(new QueryCriteria.VaultCustomQueryCriteria(linkCriteria));
-
-        return rpcOps
-                .vaultQueryByCriteria(criteria, SharedItemState.class)
-                .getStates();
-    }
-
-    private List<StateAndRef<SharedItemState>> getStatesWithLink(String link) {
-        Field linkField;
-        try {
-            linkField = SharedItemState.class.getDeclaredField("link");
-        } catch (NoSuchFieldException e) {
-            throw new RuntimeException("expected SharedItemState to have field 'link'", e);
-        }
-
-        CriteriaExpression linkCriteria = Builder.equal(linkField, link);
-        QueryCriteria criteria = new QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
-                .and(new QueryCriteria.VaultCustomQueryCriteria(linkCriteria));
-
-        return rpcOps
-                .vaultQueryByCriteria(criteria, SharedItemState.class)
-                .getStates();
-
     }
 
     /**
@@ -92,7 +45,7 @@ public class SharedItemApi {
     @Path("unresolved/{partyTmpId}")
     @Produces(MediaType.APPLICATION_JSON)
     public List<StateAndRef<SharedItemState>> getUnresolvedPartiesHandler(@PathParam("partyTmpId") String partyTmpId) {
-        return getUnresolvedParties(partyTmpId);
+        return client.getUnresolvedParties(partyTmpId);
     }
 
     /**
@@ -102,7 +55,7 @@ public class SharedItemApi {
     @Path("item/{link}")
     @Produces(MediaType.APPLICATION_JSON)
     public List<StateAndRef<SharedItemState>> getStatesWithLinkHandler(@PathParam("link") String link) {
-        return getStatesWithLink(link);
+        return client.getStatesWithLink(link);
     }
 
     /**
@@ -112,7 +65,7 @@ public class SharedItemApi {
     @Path("items")
     @Produces(MediaType.APPLICATION_JSON)
     public List<StateAndRef<SharedItemState>> getSharedItemsHandler() {
-        return getSharedItems();
+        return client.getSharedItems();
     }
 
     /**
