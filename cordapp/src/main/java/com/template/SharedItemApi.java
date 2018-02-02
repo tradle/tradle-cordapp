@@ -5,10 +5,6 @@ import net.corda.core.identity.CordaX500Name;
 import net.corda.core.identity.Party;
 import net.corda.core.messaging.CordaRPCOps;
 import net.corda.core.messaging.FlowProgressHandle;
-import net.corda.core.node.services.Vault;
-import net.corda.core.node.services.vault.Builder;
-import net.corda.core.node.services.vault.CriteriaExpression;
-import net.corda.core.node.services.vault.QueryCriteria;
 import net.corda.core.transactions.SignedTransaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +13,6 @@ import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -42,30 +37,46 @@ public class SharedItemApi {
      * Displays all states with unresolved "to" that exist in the node's vault.
      */
     @GET
-    @Path("unresolved/{partyTmpId}")
+    @Path("unresolved")
     @Produces(MediaType.APPLICATION_JSON)
-    public List<StateAndRef<SharedItemState>> getUnresolvedPartiesHandler(@PathParam("partyTmpId") String partyTmpId) {
-        return client.getUnresolvedParties(partyTmpId);
+    public List<StateAndRef<SharedItemState>> getUnresolvedPartiesHandler(@QueryParam("partyTmpId") String partyTmpId) {
+        return client.getSharedItemsWithUnresolvedTo1(partyTmpId);
+    }
+
+    /**
+     * List parties for which there are shared items
+     */
+    @GET
+    @Path("parties")
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<Party> getUnresolvedPartiesHandler() {
+        return client.listParties();
     }
 
     /**
      * Displays all states with unresolved "to" that exist in the node's vault.
      */
     @GET
-    @Path("item/{link}")
-    @Produces(MediaType.APPLICATION_JSON)
-    public List<StateAndRef<SharedItemState>> getStatesWithLinkHandler(@PathParam("link") String link) {
-        return client.getStatesWithLink(link);
-    }
-
-    /**
-     * Displays all state tips in the node's vault.
-     */
-    @GET
     @Path("items")
     @Produces(MediaType.APPLICATION_JSON)
-    public List<StateAndRef<SharedItemState>> getSharedItemsHandler() {
-        return client.getSharedItems();
+    public List<StateAndRef<SharedItemState>> listWithMatchHandler(
+            @QueryParam("link") String link,
+            @QueryParam("from") String from,
+            @QueryParam("to") String to,
+            @QueryParam("toTmpId") String toTmpId,
+            @QueryParam("timestamp") Long timestamp
+    ) {
+        if (link == null && from == null && to == null && toTmpId == null && timestamp == null) {
+            return client.list();
+        }
+
+        return client.listWithMatch(new SharedItemState(
+                from == null ? null : rpcOps.wellKnownPartyFromX500Name(CordaX500Name.parse(from)),
+                to == null ? null : rpcOps.wellKnownPartyFromX500Name(CordaX500Name.parse(from)),
+                toTmpId,
+                link,
+                timestamp == null ? -1 : timestamp
+        ));
     }
 
     /**

@@ -96,7 +96,7 @@ public class SharedItemContract implements Contract {
             check.using("previous 'to' should have been null",before.getTo() == null);
             check.using("'to' should be non-null",after.getTo() != null);
             check.using("previous 'toTmpId' should have been non-null",before.getToTmpId() != null);
-            check.using("'toTmpId' should be null",after.getToTmpId() == null);
+            check.using("'toTmpId' should not have changed",after.getToTmpId().equals(before.getToTmpId()));
             check.using("'from' and 'to' cannot be the same entity.", !after.getFrom().equals(after.getTo()));
             return null;
         });

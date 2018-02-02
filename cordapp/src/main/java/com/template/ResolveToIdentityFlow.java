@@ -78,14 +78,14 @@ public class ResolveToIdentityFlow extends FlowLogic<List<SignedTransaction>> {
 
         progressTracker.setCurrentStep(QUERY_VAULT);
 
-        Field tmpIdField;
+        Field toField;
         try {
-            tmpIdField = SharedItemSchemaV1.PersistentSharedItem.class.getDeclaredField("toTmpId");
+            toField = SharedItemSchemaV1.PersistentSharedItem.class.getDeclaredField("to");
         } catch (NoSuchFieldException f) {
-            throw new FlowException("expected schema to have field toTmpId", f);
+            throw new FlowException("expected schema to have field 'to'", f);
         }
 
-        CriteriaExpression tmpIdCriteria = Builder.equal(tmpIdField, tmpId);
+        CriteriaExpression tmpIdCriteria = Builder.isNull(toField);
 //        QueryCriteria criteria = new VaultQueryCriteria(Vault.StateStatus.UNCONSUMED);
         QueryCriteria criteria = new VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
                 .and(new VaultCustomQueryCriteria(tmpIdCriteria));
@@ -96,7 +96,7 @@ public class ResolveToIdentityFlow extends FlowLogic<List<SignedTransaction>> {
 
         List<SignedTransaction> result = new ArrayList<>();
         progressTracker.setCurrentStep(RESOLVE_TO);
-        for (StateAndRef<SharedItemState> stateAndRef: results.component1()) {
+        for (StateAndRef<SharedItemState> stateAndRef: results.getStates()) {
             SignedTransaction signedTx = setTo(stateAndRef, party, notary);
             result.add(signedTx);
         }
@@ -107,9 +107,9 @@ public class ResolveToIdentityFlow extends FlowLogic<List<SignedTransaction>> {
     @Suspendable
     private SignedTransaction setTo(StateAndRef<SharedItemState> stateAndRef, Party to, Party notary) throws FlowException {
 //        final TimeWindow window = TimeWindow.withTolerance(getServiceHub().getClock().instant(), Duration.ofSeconds(30));
-        SharedItemState inputState = stateAndRef.getState().component1();
+        SharedItemState inputState = stateAndRef.getState().getData();
         Command cmd = new Command<>(new SharedItemContract.ResolveTo(), ImmutableList.of(getOurIdentity().getOwningKey()));
-        SharedItemState outputState = new SharedItemState(inputState.getFrom(), to, null, inputState.getLink(), inputState.getTimestamp());
+        SharedItemState outputState = new SharedItemState(inputState.getFrom(), to, inputState.getToTmpId(), inputState.getLink(), inputState.getTimestamp());
         StateAndContract outputContractAndState = new StateAndContract(outputState, SHARED_SPACE_CONTRACT_ID);
 
         progressTracker.setCurrentStep(TX_BUILDING);

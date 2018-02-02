@@ -85,7 +85,7 @@ public class FlowTests {
         List<Party> signatories = new ArrayList<>(sigs.size());
         IdentityService identities = c.getServices().getIdentityService();
         for (TransactionSignature sig: sigs) {
-            Party party = identities.certificateFromKey(sig.getBy()).component1();
+            Party party = identities.certificateFromKey(sig.getBy()).getParty();
             signatories.add(party);
         }
 
@@ -105,7 +105,6 @@ public class FlowTests {
     public void shareAndResolveTo() throws Exception {
         List<String> links = ImmutableList.of("link1", "link2");
         String tmpId = "Billy Bob";
-        Party bob = b.getInfo().getLegalIdentities().get(0);
         for (String link: links) {
             SharedItemCreateFlow createFlow = new SharedItemCreateFlow(tmpId, link);
             CordaFuture<SignedTransaction> createFlowFuture = a.getServices().startFlow(createFlow).getResultFuture();
@@ -115,6 +114,9 @@ public class FlowTests {
             signedCreateFlowTx.verifyRequiredSignatures();
         }
 
+        // after we know tmpId is bob:
+
+        Party bob = b.getInfo().getLegalIdentities().get(0);
         ResolveToIdentityFlow resolveFlow = new ResolveToIdentityFlow(tmpId, bob);
 //        CordaFuture<SignedTransaction> shareFlowFuture = a.getServices().startFlow(shareFlow).getResultFuture();
         CordaFuture<List<SignedTransaction>> resolveFlowFuture = a.getServices().startFlow(resolveFlow).getResultFuture();
@@ -125,9 +127,9 @@ public class FlowTests {
         for (int i = 0; i < txs.size(); i++) {
             SignedTransaction tx = txs.get(i);
             SharedItemState state = (SharedItemState) tx.getTx().getOutput(0);
-            assert state.getLink().equals(links.get(i)) : "'link' matches original";
+            assert state.getLink().equals(links.get(i)) : "'link' has not changed";
             assert state.getTo().equals(bob) : "'to' has been resolved";
-            assert state.getToTmpId() == null : "'toTmpId' has been cleared";
+            assert state.getToTmpId().equals(tmpId): "'toTmpId' has not changed";
         }
     }
 }
