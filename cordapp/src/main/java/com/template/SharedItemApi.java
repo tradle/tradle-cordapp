@@ -13,6 +13,9 @@ import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -20,13 +23,52 @@ import java.util.stream.Collectors;
 @Path("share")
 public class SharedItemApi {
     static private final Logger logger = LoggerFactory.getLogger(SharedItemApi.class);
+    private final List<String> apiKeys;
 
     private final CordaRPCOps rpcOps;
     private final SharedItemClient client;
+//    private final Response forbidden = Response.status(Status.FORBIDDEN)
+//        .entity("invalid api key")
+//        .build();
 
     public SharedItemApi(CordaRPCOps rpcOps) {
         this.rpcOps = rpcOps;
         this.client = new SharedItemClient(rpcOps);
+        ClassLoader classloader = Thread.currentThread().getContextClassLoader();
+        InputStream is = classloader.getResourceAsStream("certificates/apikeys.txt");
+        List<String> lines = null;
+        if (is != null) {
+            try {
+                lines = readInputStream(is);
+            } catch (IOException i) {
+                logger.info("No API Key set for API");
+                lines = null;
+            }
+
+        }
+        if (lines == null) {
+            this.apiKeys = null;
+        } else {
+            this.apiKeys = lines.stream().filter(item -> !item.isEmpty()).collect(Collectors.toList());
+        }
+    }
+
+    private void auth(String apiKey) {
+        if (this.apiKeys == null || this.apiKeys.isEmpty()) return;
+        if (!this.apiKeys.contains((apiKey))) {
+            throw new WebApplicationException(Status.FORBIDDEN);
+        }
+    }
+
+    private List<String> readInputStream(InputStream is) throws IOException {
+        InputStreamReader streamReader = new InputStreamReader(is, StandardCharsets.UTF_8);
+        BufferedReader reader = new BufferedReader(streamReader);
+        List<String> lines = new ArrayList<>();
+        for (String line; (line = reader.readLine()) != null;) {
+            lines.add(line);
+        }
+
+        return lines;
     }
 
     private List<TransactionIdWrapper> txsToIds (List<SignedTransaction> txs) {
@@ -39,7 +81,11 @@ public class SharedItemApi {
     @GET
     @Path("unresolved")
     @Produces(MediaType.APPLICATION_JSON)
-    public List<StateAndRef<SharedItemState>> getUnresolvedPartiesHandler(@QueryParam("partyTmpId") String partyTmpId) {
+    public List<StateAndRef<SharedItemState>> getUnresolvedPartiesHandler(
+            @HeaderParam("Authorization") String apiKey,
+            @QueryParam("partyTmpId") String partyTmpId) {
+        auth(apiKey);
+
         return client.getSharedItemsWithUnresolvedTo1(partyTmpId);
     }
 
@@ -49,7 +95,11 @@ public class SharedItemApi {
     @GET
     @Path("parties")
     @Produces(MediaType.APPLICATION_JSON)
-    public List<Party> getUnresolvedPartiesHandler() {
+    public List<Party> getUnresolvedPartiesHandler(
+            @HeaderParam("Authorization") String apiKey
+    ) {
+        auth(apiKey);
+
         return client.listParties();
     }
 
@@ -60,12 +110,15 @@ public class SharedItemApi {
     @Path("items")
     @Produces(MediaType.APPLICATION_JSON)
     public List<StateAndRef<SharedItemState>> listWithMatchHandler(
+            @HeaderParam("Authorization") String apiKey,
             @QueryParam("link") String link,
             @QueryParam("from") String from,
             @QueryParam("to") String to,
             @QueryParam("toTmpId") String toTmpId,
             @QueryParam("timestamp") Long timestamp
     ) {
+        auth(apiKey);
+
         if (link == null && from == null && to == null && toTmpId == null && timestamp == null) {
             return client.list();
         }
@@ -87,10 +140,13 @@ public class SharedItemApi {
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     @Produces(MediaType.APPLICATION_JSON)
     public Response createSharedItemHandler(
+            @HeaderParam("Authorization") String apiKey,
             @FormParam("link") String link,
             @FormParam("partyName") CordaX500Name partyName,
             @FormParam("partyTmpId") String partyTmpId
     ) {
+        auth(apiKey);
+
         Party party = null;
         if (partyName == null) {
             if (partyTmpId == null) {
@@ -146,9 +202,12 @@ public class SharedItemApi {
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     @Produces(MediaType.APPLICATION_JSON)
     public Response resolvePartyHandler(
+            @HeaderParam("Authorization") String apiKey,
             @FormParam("partyTmpId") String partyTmpId,
             @FormParam("partyName") CordaX500Name partyName
     ) {
+        auth(apiKey);
+
         if (partyName == null) {
             return Response
                     .status(Status.BAD_REQUEST)
