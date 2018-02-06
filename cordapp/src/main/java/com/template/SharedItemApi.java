@@ -86,7 +86,7 @@ public class SharedItemApi {
             @QueryParam("partyTmpId") String partyTmpId) {
         auth(apiKey);
 
-        return client.getSharedItemsWithUnresolvedTo1(partyTmpId);
+        return client.getSharedItemsWithUnresolvedTo(partyTmpId);
     }
 
     /**
@@ -103,13 +103,42 @@ public class SharedItemApi {
         return client.listParties();
     }
 
+//    /**
+//     * Displays all states with unresolved "to" that exist in the node's vault.
+//     */
+//    @GET
+//    @Path("items")
+//    @Produces(MediaType.APPLICATION_JSON)
+//    public List<StateAndRef<SharedItemState>> listWithMatchHandler(
+//            @HeaderParam("Authorization") String apiKey,
+//            @QueryParam("link") String link,
+//            @QueryParam("from") String from,
+//            @QueryParam("to") String to,
+//            @QueryParam("toTmpId") String toTmpId,
+//            @QueryParam("timestamp") Long timestamp
+//    ) {
+//        auth(apiKey);
+//
+//        if (link == null && from == null && to == null && toTmpId == null && timestamp == null) {
+//            return client.list();
+//        }
+//
+//        return client.listWithMatch(new SharedItemState(
+//                from == null ? null : rpcOps.wellKnownPartyFromX500Name(CordaX500Name.parse(from)),
+//                to == null ? null : rpcOps.wellKnownPartyFromX500Name(CordaX500Name.parse(from)),
+//                toTmpId,
+//                link,
+//                timestamp == null ? -1 : timestamp
+//        ));
+//    }
+
     /**
      * Displays all states with unresolved "to" that exist in the node's vault.
      */
     @GET
     @Path("items")
     @Produces(MediaType.APPLICATION_JSON)
-    public List<StateAndRef<SharedItemState>> listWithMatchHandler(
+    public List<StateAndRef<SharedItemState>> listWithFilterHandler(
             @HeaderParam("Authorization") String apiKey,
             @QueryParam("link") String link,
             @QueryParam("from") String from,
@@ -123,13 +152,29 @@ public class SharedItemApi {
             return client.list();
         }
 
-        return client.listWithMatch(new SharedItemState(
-                from == null ? null : rpcOps.wellKnownPartyFromX500Name(CordaX500Name.parse(from)),
-                to == null ? null : rpcOps.wellKnownPartyFromX500Name(CordaX500Name.parse(from)),
-                toTmpId,
-                link,
-                timestamp == null ? -1 : timestamp
-        ));
+        return client.listWithFilter(state -> {
+            if (!(from == null || state.getFrom().equals(rpcOps.wellKnownPartyFromX500Name(CordaX500Name.parse(from))))) {
+                return false;
+            }
+
+            if (!(to == null || state.getTo().equals(rpcOps.wellKnownPartyFromX500Name(CordaX500Name.parse(from))))) {
+                return false;
+            }
+
+            if (!(toTmpId == null || toTmpId.equals(state.getToTmpId()))) {
+                return false;
+            }
+
+            if (!(link == null || link.equals(state.getLink()))) {
+                return false;
+            }
+
+            if (!(timestamp == null || timestamp.longValue() == state.getTimestamp())) {
+                return false;
+            }
+
+            return true;
+        });
     }
 
     /**

@@ -7,12 +7,28 @@ import net.corda.core.schemas.PersistentState;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Table;
+import java.lang.reflect.Field;
 import java.util.UUID;
 
 public class SharedItemSchemaV1 extends MappedSchema {
     public SharedItemSchemaV1() {
         super(SharedItemSchema.class, 1, ImmutableList.of(PersistentSharedItem.class));
     }
+
+    public static Field getField(String name) {
+        try {
+            return SharedItemSchemaV1.PersistentSharedItem.class.getDeclaredField(name);
+        } catch (NoSuchFieldException e) {
+            throw new IllegalArgumentException(String.format("expected SharedItemState to have field '%s'", name), e);
+        }
+    }
+
+    public static final Field from = getField("from");
+    public static final Field to = getField("to");
+    public static final Field toTmpId = getField("toTmpId");
+    public static final Field link = getField("link");
+    public static final Field timestamp = getField("timestamp");
+    public static final Field linearId = getField("linearId");
 
     @Entity
     @Table(name = "shared_item_states")

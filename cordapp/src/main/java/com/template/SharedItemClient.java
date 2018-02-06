@@ -1,6 +1,8 @@
 package com.template;
 
 import com.google.common.collect.ImmutableList;
+import com.template.schema.SharedItemSchema;
+import com.template.schema.SharedItemSchemaV1;
 import net.corda.client.rpc.CordaRPCClient;
 import net.corda.client.rpc.CordaRPCClientConfiguration;
 import net.corda.core.contracts.StateAndRef;
@@ -73,48 +75,48 @@ public class SharedItemClient {
                 .collect(Collectors.toList());
     }
 
-    public List<StateAndRef<SharedItemState>> listWithMatch(SharedItemState state) {
-        return listWithFilter(item -> {
-            if (state.getLink() != null && !item.getLink().equals(state.getLink())) return false;
-            if (state.getTo() != null && !item.getTo().equals(state.getTo())) return false;
-            if (state.getToTmpId() != null && !item.getToTmpId().equals(state.getToTmpId())) return false;
-            if (state.getFrom() != null && !item.getFrom().equals(state.getFrom())) return false;
-            if (state.getTimestamp() > 0 && item.getTimestamp() != state.getTimestamp()) return false;
-            return true;
-        });
-    }
+//    public List<StateAndRef<SharedItemState>> listWithMatch(SharedItemState state) {
+//        return listWithFilter(item -> {
+//            if (state.getLink() != null && !item.getLink().equals(state.getLink())) return false;
+//            if (state.getTo() != null && !item.getTo().equals(state.getTo())) return false;
+//            if (state.getToTmpId() != null && !item.getToTmpId().equals(state.getToTmpId())) return false;
+//            if (state.getFrom() != null && !item.getFrom().equals(state.getFrom())) return false;
+//            if (state.getTimestamp() > 0 && item.getTimestamp() != state.getTimestamp()) return false;
+//            return true;
+//        });
+//    }
 
 
-    /**
-     * @return state tips with unresolved to
-     * @implNote: this method is inefficient as it filters in memory
-     * remove when the custom schema registration is figured out
-     */
-    public List<StateAndRef<SharedItemState>> getSharedItemsWithUnresolvedTo1(String partyTmpId) {
-        return listWithFilter(state -> {
-            if (state.getTo() != null) return false;
+//    /**
+//     * @return state tips with unresolved to
+//     * @implNote: this method is inefficient as it filters in memory
+//     * remove when the custom schema registration is figured out
+//     */
+//    public List<StateAndRef<SharedItemState>> getSharedItemsWithUnresolvedTo1(String partyTmpId) {
+//        return listWithFilter(state -> {
+//            if (state.getTo() != null) return false;
+//
+//            return partyTmpId == null || state.getToTmpId().equals(partyTmpId);
+//        });
+//    }
+//
+//    /**
+//     * @return state tips with unresolved to
+//     * @implNote: this method is inefficient as it filters in memory
+//     * remove when the custom schema registration is figured out
+//     */
+//    public List<StateAndRef<SharedItemState>> getSharedItemsWithUnresolvedTo1() {
+//        return getSharedItemsWithUnresolvedTo1(null);
+//    }
 
-            return partyTmpId == null || state.getToTmpId().equals(partyTmpId);
-        });
-    }
-
-    /**
-     * @return state tips with unresolved to
-     * @implNote: this method is inefficient as it filters in memory
-     * remove when the custom schema registration is figured out
-     */
-    public List<StateAndRef<SharedItemState>> getSharedItemsWithUnresolvedTo1() {
-        return getSharedItemsWithUnresolvedTo1(null);
-    }
-
-    /**
-     * @return state tips with unresolved to
-     * @implNote: this method is inefficient as it filters in memory
-     * remove when the custom schema registration is figured out
-     */
-    public List<StateAndRef<SharedItemState>> getStatesWithLink1(String link) {
-        return listWithFilter(state -> state.getLink().equals(link));
-    }
+//    /**
+//     * @return state tips with unresolved to
+//     * @implNote: this method is inefficient as it filters in memory
+//     * remove when the custom schema registration is figured out
+//     */
+//    public List<StateAndRef<SharedItemState>> getStatesWithLink1(String link) {
+//        return listWithFilter(state -> state.getLink().equals(link));
+//    }
 
     public List<StateAndRef<SharedItemState>> getSharedItemsWithUnresolvedTo() {
         return getSharedItemsWithUnresolvedTo(null);
@@ -125,22 +127,8 @@ public class SharedItemClient {
      * @return state tips with unresolved identities
      */
     public List<StateAndRef<SharedItemState>> getSharedItemsWithUnresolvedTo(String partyTmpId) {
-        Field toTmpIdField;
-        try {
-            toTmpIdField = SharedItemState.class.getDeclaredField("toTmpId");
-        } catch (NoSuchFieldException e) {
-            throw new RuntimeException("expected SharedItemState to have field 'toTmpId'", e);
-        }
-
-        Field toField;
-        try {
-            toField = SharedItemState.class.getDeclaredField("to");
-        } catch (NoSuchFieldException e) {
-            throw new RuntimeException("expected SharedItemState to have field 'to'", e);
-        }
-
-        CriteriaExpression toTmpIdCriteria = Builder.equal(toTmpIdField, partyTmpId);
-        CriteriaExpression toCriteria = Builder.isNull(toField);
+        CriteriaExpression toTmpIdCriteria = Builder.equal(SharedItemSchemaV1.toTmpId, partyTmpId);
+        CriteriaExpression toCriteria = Builder.isNull(SharedItemSchemaV1.to);
         QueryCriteria criteria = new QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
                 .and(new QueryCriteria.VaultCustomQueryCriteria(toCriteria));
 
@@ -154,14 +142,7 @@ public class SharedItemClient {
     }
 
     public List<StateAndRef<SharedItemState>> getStatesWithLink(String link) {
-        Field linkField;
-        try {
-            linkField = SharedItemState.class.getDeclaredField("link");
-        } catch (NoSuchFieldException e) {
-            throw new RuntimeException("expected SharedItemState to have field 'link'", e);
-        }
-
-        CriteriaExpression linkCriteria = Builder.equal(linkField, link);
+        CriteriaExpression linkCriteria = Builder.equal(SharedItemSchemaV1.link, link);
         QueryCriteria criteria = new QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
                 .and(new QueryCriteria.VaultCustomQueryCriteria(linkCriteria));
 
