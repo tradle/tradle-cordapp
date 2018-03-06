@@ -5,13 +5,59 @@ This CorDapp is an adapter for [Tradle](https://github.com/tradle). It is used f
 
 *Forked from the [CorDapp Java template](https://github.com/corda/cordapp-template-java)*
 
-## Usage
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**
+
+- [Configuration](#configuration)
+- [Moving Parts Overview](#moving-parts-overview)
+  - [Flows](#flows)
+  - [Contract](#contract)
+  - [State](#state)
+  - [Vault Client](#vault-client)
+  - [REST API](#rest-api)
+    - [GET /api/share/items](#get-apishareitems)
+    - [GET /api/share/unresolved](#get-apishareunresolved)
+    - [POST /api/share/item](#post-apishareitem)
+    - [POST /api/share/resolveparty](#post-apishareresolveparty)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+## Configuration
 
 build.gradle is configured to launch 3 nodes (Party A, B, C)
 
 the webservers for these nodes live at 10007, 10010, 10013 respectively
 
+## Moving Parts Overview
+
+### Flows
+
+- create "shared item" [initiator flow](https://github.com/tradle/tradle-cordapp/blob/master/cordapp/src/main/java/com/template/SharedItemCreateFlow.java): If the counterparty doesn't have a Corda node yet, saves a toTmpId (Tradle identity hash), to be resolved later. Otherwise creates state with two parties (see responder flow)
+
+- create "shared item" [responder flow](https://github.com/tradle/tradle-cordapp/blob/master/cordapp/src/main/java/com/template/CreateFlowResponder.java) (if counterparty already has a corda node): checks if has data identified by "link", e.g. in some external database. If so, confirms state creation
+
+- resolve identity [initiator flow](https://github.com/tradle/tradle-cordapp/blob/master/cordapp/src/main/java/com/template/ResolveToIdentityFlow.java): resolve toTmpId to Corda party in all shared items, i.e. updates state objects with `toTmpId == [given toTmpId]` with `to = [given Corda Party]`
+
+### Contract
+
+(state change validation)
+
+[Contract code](./cordapp-contracts-states/src/main/java/com/template/SharedItemContract.java)
+
+### State
+
+[Code](https://github.com/tradle/tradle-cordapp/blob/master/cordapp-contracts-states/src/main/java/com/template/SharedItemState.java)
+
+### Vault Client
+
+(RPC calls, used by REST API module)
+
+[Code](https://github.com/tradle/tradle-cordapp/blob/master/cordapp/src/main/java/com/template/SharedItemClient.java)
+
 ### REST API
+
+[Code](https://github.com/tradle/tradle-cordapp/blob/master/cordapp/src/main/java/com/template/SharedItemApi.java)
 
 #### GET /api/share/items
   @HeaderParam("Authorization")  
